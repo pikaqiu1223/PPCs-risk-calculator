@@ -1,0 +1,47 @@
+model,feature,feature_label,domain,mean_abs_shap,mean_shap
+LightGBM_A,Sex_bin,Sex,Demographics/body habitus,0.32598071449002713,-0.07348436005668013
+LightGBM_A,FEV1/FVC,FEV1/FVC,Pulmonary reserve,0.3110612961102029,-0.25587837477679465
+LightGBM_A,MEF25%pred,MEF25% predicted,Small-airway function,0.17975646528537,-0.1158680121603725
+LightGBM_A,FVC%pred,FVC% predicted,Pulmonary reserve,0.15980898678620012,-0.14278761957926597
+LightGBM_A,BMI,BMI,Demographics/body habitus,0.10425542338631677,-0.09701072197435144
+LightGBM_A,Age,Age,Demographics/body habitus,0.10099103533187546,-0.005084881706491987
+LightGBM_A,Surgery_code,Surgery type,Surgical type,0.085521919874485,-0.012034419115879397
+LightGBM_A,Chronic lung disease,Chronic lung disease,Comorbidity burden,0.08080859976651579,-0.07990049326777256
+LightGBM_A,AAPR_log,AAPR log,Other,0.06444624357622133,-0.05616715822585247
+LightGBM_A,PLR_log,PLR log,Other,0.058080865764363956,0.05425561865606596
+LightGBM_A,SII_log,Log SII,Inflammatory ratios,0.05573055442812555,0.007847818271165713
+LightGBM_A,ASA physical status classification,ASA physical status,Functional status,0.05294461947905809,-0.015742287365751718
+LightGBM_A,Lymphocyte count,Lymphocyte count,Laboratory markers,0.04777731692572582,-0.03757529147416719
+LightGBM_A,Cerebral infarction,Cerebral infarction,Comorbidity burden,0.031123134710907652,-0.02898851898296447
+LightGBM_A,MVV%pred,MVV% predicted,Pulmonary reserve,0.02819811787734366,-0.022080197584305215
+LightGBM_A,Coronary heart disease,Coronary heart disease,Comorbidity burden,0.004850620594298606,-0.004578973859104685
+LightGBM_A,Hypertension,Hypertension,Comorbidity burden,0.00258840367951778,0.00024022770721054452
+LightGBM_A,Single port,Single port,Surgical type,0.00012281404325093802,8.142933907928125e-05
+LightGBM_A,Previous pulmonary surgery,Previous pulmonary surgery,Comorbidity burden,0.0,0.0
+LightGBM_B,OpDur_log,Operation duration (log),Intraoperative burden,0.697269524213925,0.5739924776431168
+LightGBM_B,FEV1/FVC,FEV1/FVC,Pulmonary reserve,0.30438096166126294,0.26960384979159585
+LightGBM_B,Sex_bin,Sex,Demographics/body habitus,0.2762108828661408,0.05079766434148319
+LightGBM_B,ASA physical status classification,ASA physical status,Functional status,0.21931716109588076,-0.13343985170977749
+LightGBM_B,Age,Age,Demographics/body habitus,0.19150764875499088,0.05994159130940765
+LightGBM_B,FVC%pred,FVC% predicted,Pulmonary reserve,0.13094116772207726,-0.029433470621915717
+LightGBM_B,MEF25%pred,MEF25% predicted,Small-airway function,0.11685506393819801,0.06455513304366581
+LightGBM_B,PLR_log,PLR log,Other,0.09222486545979942,-0.009031823748910367
+LightGBM_B,BMI,BMI,Demographics/body habitus,0.07764061429042907,0.0012655921651403739
+LightGBM_B,SII_log,Log SII,Inflammatory ratios,0.07555281157270352,0.001894516230091736
+LightGBM_B,Intraoperative input,Intraoperative input,Intraoperative burden,0.07220608960728686,-0.034329283605725375
+LightGBM_B,AAPR_log,AAPR log,Other,0.06675468761635218,-0.006088979753189672
+LightGBM_B,MVV%pred,MVV% predicted,Pulmonary reserve,0.040510523212800846,0.006017389991089174
+LightGBM_B,Glucocorticoids,Glucocorticoids,Intraoperative management,0.03533467281462422,-0.02726708840793985
+LightGBM_B,Lymphocyte count,Lymphocyte count,Laboratory markers,0.03079082194061223,-0.0016831032289617524
+LightGBM_B,NSAIDs,NSAIDs,Intraoperative management,0.0257435385998847,-0.0016337487123070052
+LightGBM_B,Surgery_code,Surgery type,Surgical type,0.024892026620481046,-0.0002295397150455681
+LightGBM_B,NMB_reversal,NMB reversal,Intraoperative management,0.015887528070728126,0.011761440750277227
+LightGBM_B,Dexmedetomidine,Dexmedetomidine,Intraoperative management,0.014544798030047363,0.012131045259862147
+LightGBM_B,Nerve block,Nerve block,Intraoperative management,0.010417225803342261,0.0025613358978117187
+LightGBM_B,Hypertension,Hypertension,Comorbidity burden,0.007337957202246303,0.001799240593898332
+LightGBM_B,Single port,Single port,Surgical type,0.004663279804988571,-0.0035676876693557244
+LightGBM_B,Cerebral infarction,Cerebral infarction,Comorbidity burden,0.0045830082434360035,0.0002562098750278924
+LightGBM_B,Coronary heart disease,Coronary heart disease,Comorbidity burden,0.003281818077643383,-0.0008876191751863493
+LightGBM_B,Anesthesia_balanced,Balanced anesthesia,Intraoperative management,0.000555308914350697,-0.00019260289028145866
+LightGBM_B,Previous pulmonary surgery,Previous pulmonary surgery,Comorbidity burden,0.0003370009705867328,-5.8019475468662775e-05
+LightGBM_B,Chronic lung disease,Chronic lung disease,Comorbidity burden,0.0,0.0
