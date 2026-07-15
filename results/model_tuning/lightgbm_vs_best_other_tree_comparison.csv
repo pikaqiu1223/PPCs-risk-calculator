@@ -1,3 +1,0 @@
-feature_set,n_features,lightgbm_auc,lightgbm_sd,best_other_tree_model,best_other_tree_auc,best_other_tree_sd,lightgbm_minus_other_auc,warning_other_ge_lightgbm
-Model_A_final,19,0.7395220345859324,0.0287412966472543,XGBoost,0.7382981076431555,0.0311478828295914,0.0012239269427768429,False
-Model_B_final,27,0.7749697105275872,0.0245009417733315,XGBoost,0.7747820757380846,0.025884632862117,0.00018763478950267753,False
