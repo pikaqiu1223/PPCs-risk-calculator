@@ -1,3 +1,0 @@
-﻿comparison,delta_auc,ci_low,ci_high,bootstrap_p
-LightGBM_B_calibrated_minus_CatBoost_B_calibrated,-0.0019767012809024376,-0.008889880308480888,0.005497404080703243,0.606
-LightGBM_B_calibrated_minus_ARISCAT_partial,0.06759439846783688,0.04218511549523694,0.09269640832026212,0.0
