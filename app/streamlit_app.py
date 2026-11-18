@@ -15,9 +15,6 @@ import streamlit as st
 
 # ==========================================
 # 1. 路径与配置（自动向上搜索 results/models/locked_model_metadata.json 所在目录）
-#    兼容两种脚本位置：
-#      ppcs_risk_model_github_ture/app/streamlit_app.py
-#      ppcs_risk_model_github_ture/PPCs-risk-calculator/app/streamlit_app.py
 # ==========================================
 
 def _find_project_root() -> Path:
@@ -47,6 +44,9 @@ MODEL_DIR = RESULTS_DIR / "models"
 FEATURE_REG_PATH = RESULTS_DIR / "feature_selection" / "feature_registry_v3.json"
 METADATA_PATH = MODEL_DIR / "locked_model_metadata.json"
 INVENTORY_PATH = MODEL_DIR / "locked_model_inventory.csv"
+
+# 全局诊断信息（模型加载失败时记录原因）
+_MODEL_LOAD_ERROR: str | None = None
 
 FEATURE_LABELS = {
     "Age": "Age (years)",
@@ -117,7 +117,7 @@ st.markdown(
 )
 
 # ==========================================
-# 2. 数据加载与缓存（缓存函数内部不调用 st.*，避免 ScriptRunContext 警告）
+# 2. 数据加载与缓存
 # ==========================================
 
 @st.cache_resource
@@ -172,9 +172,7 @@ def load_defaults() -> dict[str, float]:
     }
 
     defaults = {}
-    target_cols = list(RANGE.keys())
-
-    for col in target_cols:
+    for col in RANGE.keys():
         min_val, max_val, fallback = RANGE[col]
         val = fallback
         if col in df.columns and not df[col].isna().all():
@@ -184,12 +182,11 @@ def load_defaults() -> dict[str, float]:
                 else:
                     mode_series = df[col].mode()
                     v = float(mode_series.iloc[0]) if not mode_series.empty else fallback
-                # 血红蛋白单位自动转换 (g/L 转为 g/dL)，静默处理，不弹任何警告
+                # 血红蛋白单位自动转换 (g/L -> g/dL)，静默处理
                 if col == "Hemoglobin" and v > 20.0:
                     v = v / 10.0
                 if min_val <= v <= max_val:
                     val = v
-                # 超出范围时静默使用 fallback，不再显示警告
             except Exception:
                 val = fallback
         defaults[col] = val
@@ -200,39 +197,88 @@ def load_defaults() -> dict[str, float]:
 
     return defaults
 
+def _resolve_model_path(model_name: str, info: dict, letter: str) -> Path | None:
+    """三级查找模型文件：metadata 记录路径 -> 标准相对路径 -> 目录扫描按 A/B 匹配"""
+    models_dir = PROJECT_ROOT / "results" / "models"
+    tried: list[Path] = []
+
+    raw = info.get("joblib_path")
+    if raw:
+        p = Path(str(raw))
+        if p.is_absolute():
+            tried.append(p)                      # 本地绝对路径（Windows 下有效）
+        else:
+            tried.append(PROJECT_ROOT / p)       # 相对路径按仓库根拼接
+
+    tried.append(models_dir / f"{model_name}.joblib")
+    tried.append(models_dir / f"{model_name.replace('_final', '')}.joblib")
+
+    for c in tried:
+        try:
+            if c.is_file():
+                return c
+        except OSError:
+            continue
+
+    # 兜底：扫描 models 目录，按 A/B 字母模糊匹配
+    if models_dir.is_dir():
+        for f in sorted(models_dir.glob("*.joblib")):
+            stem = f.stem.upper()
+            if letter == "A" and ("_A" in stem or stem.endswith("A")):
+                return f
+            if letter == "B" and ("_B" in stem or stem.endswith("B")):
+                return f
+    return None
+
 @st.cache_resource
 def get_models(_metadata: dict) -> tuple[dict, dict] | None:
+    global _MODEL_LOAD_ERROR
+    _MODEL_LOAD_ERROR = None
+
     best_models = _metadata.get("best_models", {})
     model_a_name = best_models.get("Model_A_final", "LightGBM_A")
     model_b_name = best_models.get("Model_B_final", "LightGBM_B")
 
-    model_info_a = _metadata.get("models", {}).get(model_a_name, {})
-    model_info_b = _metadata.get("models", {}).get(model_b_name, {})
+    all_models_info = _metadata.get("models", {})
+    path_a = _resolve_model_path(model_a_name, all_models_info.get(model_a_name, {}), "A")
+    path_b = _resolve_model_path(model_b_name, all_models_info.get(model_b_name, {}), "B")
 
-    path_a = PROJECT_ROOT / model_info_a.get("joblib_path", f"results/models/{model_a_name}.joblib")
-    path_b = PROJECT_ROOT / model_info_b.get("joblib_path", f"results/models/{model_b_name}.joblib")
-
-    if not path_a.exists() or not path_b.exists():
+    if path_a is None or path_b is None:
+        _MODEL_LOAD_ERROR = (
+            f"Could not locate joblib files. "
+            f"Model A name: {model_a_name}, Model B name: {model_b_name}."
+        )
         return None
 
-    obj_a = joblib.load(path_a)
-    obj_b = joblib.load(path_b)
+    registry = load_registry()
+    if registry is None:
+        _MODEL_LOAD_ERROR = "feature_registry_v3.json could not be loaded."
+        return None
+
+    features = {
+        "A": registry.get("Model_A_final", []),
+        "B": registry.get("Model_B_final", []),
+    }
+    if not features["A"] or not features["B"]:
+        _MODEL_LOAD_ERROR = (
+            "Feature registry loaded but keys 'Model_A_final'/'Model_B_final' "
+            f"are missing or empty. Registry keys found: {list(registry.keys())}"
+        )
+        return None
+
+    try:
+        obj_a = joblib.load(path_a)
+        obj_b = joblib.load(path_b)
+    except Exception as e:
+        _MODEL_LOAD_ERROR = f"joblib.load failed: {e}"
+        return None
 
     def extract(m):
         if isinstance(m, dict):
             return m.get("model", m)
         return m
 
-    registry = load_registry()
-    if registry is None:
-        return None
-
-    models = {"A": extract(obj_a), "B": extract(obj_b)}
-    features = {
-        "A": registry.get("Model_A_final", []),
-        "B": registry.get("Model_B_final", []),
-    }
-    return models, features
+    return {"A": extract(obj_a), "B": extract(obj_b)}, features
 
 @st.cache_data
 def load_thresholds(_metadata: dict) -> tuple[float, float]:
@@ -246,9 +292,7 @@ def load_thresholds(_metadata: dict) -> tuple[float, float]:
         if p.exists():
             try:
                 df = pd.read_csv(p)
-                col_model = None
-                col_algo = None
-                col_th = None
+                col_model = col_algo = col_th = None
                 for c in df.columns:
                     if "Model" in c: col_model = c
                     if "Algorithm" in c: col_algo = c
@@ -272,7 +316,6 @@ def load_thresholds(_metadata: dict) -> tuple[float, float]:
 
     if th_a is None or th_b is None:
         return 0.38, 0.37
-
     return th_a, th_b
 
 # ==========================================
@@ -282,19 +325,13 @@ def load_thresholds(_metadata: dict) -> tuple[float, float]:
 def calculate_ideal_weight(height_cm: float, sex_bin: int) -> float:
     height_in = height_cm / 2.54
     base_height_in = 60.0
-
     if sex_bin == 1:
-        base_w = 48.0
-        factor = 2.7
+        base_w, factor = 48.0, 2.7
     else:
-        base_w = 45.5
-        factor = 2.2
-
+        base_w, factor = 45.5, 2.2
     if height_in < base_height_in:
         return base_w
-
-    ideal_w = base_w + factor * (height_in - base_height_in)
-    return ideal_w
+    return base_w + factor * (height_in - base_height_in)
 
 def compute_derived_features(user_input: dict, defaults: dict) -> dict:
     res = {}
@@ -303,33 +340,24 @@ def compute_derived_features(user_input: dict, defaults: dict) -> dict:
         "Cerebral infarction", "Chronic lung disease",
         "Current smoking", "Malignant tumor history", "Previous pulmonary surgery"
     ]
-    count = sum(1 for c in comorbidities if user_input.get(c, 0) == 1)
-    res["Comorbidity_count"] = float(count)
+    res["Comorbidity_count"] = float(sum(1 for c in comorbidities if user_input.get(c, 0) == 1))
 
     platelets = user_input.get("Platelet count", defaults.get("Platelet count", 200.0))
     neu = user_input.get("Neutrophil count", defaults.get("Neutrophil count", 4.0))
     lym = user_input.get("Lymphocyte count", defaults.get("Lymphocyte count", 2.0))
-
-    if lym > 0:
-        sii = (platelets * neu) / lym
-    else:
-        sii = 0
-
+    sii = (platelets * neu) / lym if lym > 0 else 0
     res["SII_log"] = float(np.log1p(sii))
 
     alb = user_input.get("Albumin", defaults.get("Albumin", 40.0))
     w_act = user_input.get("Weight", defaults.get("Weight", 65.0))
     h = user_input.get("Height", defaults.get("Height", 165.0))
     sex = user_input.get("Sex_bin", 0)
-
     w_ideal = calculate_ideal_weight(h, sex)
     ratio = w_act / w_ideal if w_ideal > 0 else 1.0
-    gnri = 1.489 * alb + 41.7 * ratio
-    res["GNRI"] = min(max(gnri, 60.0), 150.0)
+    res["GNRI"] = min(max(1.489 * alb + 41.7 * ratio, 60.0), 150.0)
 
     op_dur = user_input.get("Operation duration", defaults.get("Operation duration", 84.0))
     res["OpDur_log"] = float(np.log1p(op_dur))
-
     return res
 
 def build_prediction_vector(user_input: dict, derived: dict, features: list[str], defaults: dict) -> pd.DataFrame:
@@ -348,7 +376,6 @@ def build_prediction_vector(user_input: dict, derived: dict, features: list[str]
 # ==========================================
 
 def _show_pyplot(fig):
-    """兼容不同版本 Streamlit 的 pyplot 显示方式"""
     try:
         st.pyplot(fig, width="stretch")
     except TypeError:
@@ -491,8 +518,6 @@ def main():
     st.title("PPCs Risk Calculator (Enhanced)")
     st.caption("Including accurate calculation of SII and GNRI based on full lab parameters.")
 
-
-
     # === 免责声明 ===
     st.warning("""
     ⚠️ RESEARCH PROTOTYPE & DISCLAIMER
@@ -503,19 +528,30 @@ def main():
 
     Exploratory Clinical Utility: The proposed decision thresholds and clinical pathways are exploratory and require prospective validation. Do not use this tool as the sole trigger for clinical interventions (e.g., ICU admission).
     """)
-    # ================
 
     metadata = load_metadata()
     if metadata is None:
         st.error("Model metadata not found. App cannot start.")
         st.info(f"Checked path: {METADATA_PATH}")
-        st.info("Please make sure 'results/models/locked_model_metadata.json' exists in the project root, or set the environment variable PPCS_PROJECT_ROOT to the folder that contains it.")
         st.stop()
 
     loaded = get_models(metadata)
     if loaded is None:
         st.error("Model files or feature registry not found. App cannot start.")
-        st.info(f"Project root in use: {PROJECT_ROOT}")
+        st.info(f"Project root in use: `{PROJECT_ROOT}`")
+
+        models_dir = PROJECT_ROOT / "results" / "models"
+        if models_dir.is_dir():
+            files = sorted(f.name for f in models_dir.iterdir() if f.is_file())
+            st.info("Files actually present in results/models/: " + (", ".join(files) if files else "(empty)"))
+        else:
+            st.info(f"Directory does not exist on the server: `{models_dir}`")
+
+        st.info(f"feature_registry_v3.json exists: {FEATURE_REG_PATH.exists()}")
+
+        st.info(f"best_models from metadata: {metadata.get('best_models', {})}")
+        if _MODEL_LOAD_ERROR:
+            st.error("Diagnosis detail: " + _MODEL_LOAD_ERROR)
         st.stop()
 
     models, features = loaded
